@@ -1,0 +1,182 @@
+from flask import Flask, request, render_template_string
+import requests
+
+app = Flask(__name__)
+
+index_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Search</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            animation: fadeInAnimation ease 1s;
+            animation-iteration-count: 1;
+            animation-fill-mode: forwards;
+        }
+        @keyframes fadeInAnimation {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            animation: slideInAnimation ease 1s;
+            animation-iteration-count: 1;
+            animation-fill-mode: forwards;
+        }
+        @keyframes slideInAnimation {
+            0% {
+                transform: translateY(-50px);
+            }
+            100% {
+                transform: translateY(0);
+            }
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        form {
+            text-align: center;
+        }
+        input[type="text"], input[type="number"], input[type="submit"] {
+            width: 80%;
+            padding: 10px;
+            margin: 10px auto;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        input[type="submit"] {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+        h2, h3 {
+            color: #333;
+            margin-top: 20px;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 10px;
+        }
+        li {
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+            animation: fadeInListItems ease 1s;
+            animation-iteration-count: 1;
+            animation-fill-mode: forwards;
+        }
+        @keyframes fadeInListItems {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Medical Search</h1>
+        <form action="/" method="post">
+            <input type="text" id="query" name="query" placeholder="Enter your query...">
+            <br>
+            <input type="number" id="age" name="age" min="0" placeholder="Enter your age...">
+            <br><br>
+            <input type="submit" value="Search">
+        </form>
+        {% if query %}
+        <h2>Search Results</h2>
+        <p>Disease {{ query }}</p>
+        <h3>Medicine Suggestions:</h3>
+        <ul>
+            {% for suggestion in suggestions %}
+            <li>{{ suggestion }}</li>
+            {% endfor %}
+        </ul>
+        {% elif query and not suggestions %}
+        <p>No medicine suggestions found for your query and age.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
+"""
+
+def get_medication_suggestions(age):
+    suggestions = []
+    if age <= 12:
+        suggestions.append("Acetaminophen (Tylenol) - Dosage: Follow pediatrician's recommendation; Timing: Every 4-6 hours as needed.")
+    elif 12 < age <= 65:
+        suggestions.append("Ibuprofen (Advil, Motrin) - Dosage: Follow recommended dosage on the label; Timing: Take with food.")
+    else:
+        suggestions.append("Aspirin - Dosage: Follow doctor's recommendation; Timing: Usually taken once daily.")
+    return suggestions
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        # Get user query from request
+        user_query = request.form['query']
+        # Get user age from request
+        user_age = int(request.form['age'])
+        
+         
+        
+        
+        
+
+        # Make a request to the OpenFDA API
+        api_key = '3CbGKQVwoIK3isg4d3RJJH2Gff0cMq8heCQuRXv3'  # Replace with your actual API key
+        url = f'https://api.fda.gov/drug/label.json?search=indications_and_usage:{user_query}&limit=3&api_key={api_key}'
+        response = requests.get(url)
+
+        # Parse the JSON response
+        if response.status_code == 200:
+            data = response.json()
+            if 'results' in data:
+                suggestions = [result['openfda']['brand_name'][0] for result in data['results'] if 'openfda' in result and 'brand_name' in result['openfda']]
+            else:
+                suggestions = []
+        else:
+            suggestions = []
+
+        # Get medication suggestions based on user's age
+        medication_suggestions = get_medication_suggestions(user_age)
+
+        # Add medication suggestions based on age to the existing suggestions
+        suggestions.extend(medication_suggestions)
+
+        # Render the search results template with the query and suggestions
+        return render_template_string(index_html, query=user_query, suggestions=suggestions)
+    else:
+        return render_template_string(index_html)
+
+if __name__ == '__main__':
+    app.run(debug=True)
